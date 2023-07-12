@@ -38,23 +38,47 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
   const user = req.body;
-  pool.query(
-    `SELECT * FROM user where username = '${user.username}' AND password = '${user.password}';  `,
-    function (error, results, fields) {
-      if (error) console.error(error);
+  const loginQuery = `SELECT * FROM user where username = '${user.username}' AND password = '${user.password}'; `;
+  const result = await promisedQuery(loginQuery);
+  if (result) {
+    res.status(200).send({ status: "Login Successfull" });
+  } else res.status(401).send({ staus: "Incorrect username or password" });
+});
 
-      if (results?.length > 0) res.send({ status: "login_successfull" });
-      else res.status(400).send({ status: "login_failed" });
-    }
-  );
+app.post("/products/filter", async (req, res) => {
+  const filter = req.body;
+  const { pageNumber } = filter ?? 1;
+  const { pageSize } = filter ?? 10;
+  const offset = (pageNumber - 1) * pageSize;
+
+  try {
+    const countQuery = `SELECT COUNT(*) as total FROM products`;
+    const countResults = await promisedQuery(countQuery);
+    const productQuery = `SELECT p.*, GROUP_CONCAT(f.file_key) as images FROM products p 
+    LEFT JOIN product_file pf
+    ON p.id = pf.product_id
+    LEFT JOIN file f
+    ON f.id = pf.file_id
+    GROUP BY p.id limit ${offset}, ${pageSize}`;
+    const productResults = await promisedQuery(productQuery);
+
+    res.status(200).send({
+      status: "Product Fetched Successfull",
+      totalElements: countResults[0].total,
+      body: productResults,
+    });
+  } catch (error) {
+    console.error("error ", error);
+    res.status(500).send({ status: "Failed to get products" });
+  }
 });
 
 app.post("/products", (req, res) => {
   const product = req.body;
   pool.query(
-    `INSERT INTO products (name, details, price, category) VALUES ('${product.name}','${product.detail}','${product.price}','${product.category}');`,
+    `INSERT INTO products (name, details,size, price, category) VALUES ('${product.name}','${product.detail}' ,'${product.size}','${product.price}','${product.category}');`,
     function (error, results, fields) {
       // if (results?.length > 0) res.send({ status: "login_successfull" });
       // else res.send({ status: "login_failed" });
@@ -65,11 +89,21 @@ app.post("/products", (req, res) => {
       } else {
         res.send({ status: "200 OK", message: "Product Added" });
       }
-
-      // Send the product list as JSON response
-      res.json(results);
     }
   );
+});
+s;
+app.post("/orders", (req, res) => {
+  const orders = req.body;
+  const orderQuery = `INSERT INTO orders(username, productName, address, paymentMethod, price) VALUES ('${orders.username}','${orders.productName}','${orders.address}','${orders.paymentMethod}','${orders.price}');`;
+  pool.query(orderQuery, function (error, results, fields) {
+    if (error) {
+      console.error("Error inserting order:", error);
+      res.status(500).send({ status: "Failed to insert order" });
+    } else {
+      res.status(200).send({ status: "Order inserted successfully" });
+    }
+  });
 });
 
 app.post("/feedback", (req, res) => {
@@ -86,6 +120,22 @@ app.post("/feedback", (req, res) => {
     }
   );
 });
+
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
+
+function promisedQuery(query) {
+  return new Promise((resolve, reject) => {
+    pool.query(query, (error, results, fields) => {
+      if (error) reject(error);
+      else {
+        resolve(results);
+      }
+    });
+  });
+
+  function failResponse(status, body) {}
+
+  function successResponse(status, body) {}
+}
