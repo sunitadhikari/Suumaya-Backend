@@ -92,20 +92,46 @@ app.post("/products", (req, res) => {
     }
   );
 });
-s;
-app.post("/orders", (req, res) => {
-  const orders = req.body;
-  const orderQuery = `INSERT INTO orders(username, productName, address, paymentMethod, price) VALUES ('${orders.username}','${orders.productName}','${orders.address}','${orders.paymentMethod}','${orders.price}');`;
-  pool.query(orderQuery, function (error, results, fields) {
-    if (error) {
-      console.error("Error inserting order:", error);
-      res.status(500).send({ status: "Failed to insert order" });
-    } else {
-      res.status(200).send({ status: "Order inserted successfully" });
-    }
-  });
+app.post("/orders/filter", async (req, res) => {
+  const { username, pageNumber, pageSize } = req.body;
+  const countQuery = `SELECT count(o.id) as total FROM orders o LEFT JOIN user u ON o.user_id = u.id WHERE u.username = '${username}'
+`;
+  try {
+    const countResults = await promisedQuery(countQuery);
+    const ordersQuery = `SELECT o.*, u.username as boughtBy  FROM orders o LEFT JOIN user u ON o.user_id = u.id WHERE u.username = '${username}'
+  ORDER BY o.id desc
+  LIMIT ${(pageNumber - 1) * pageSize} , ${pageSize} ; `;
+    const orderResults = await promisedQuery(ordersQuery);
+    res.status(200).send({
+      status: "Orders Fetched Successfull",
+      totalElements: countResults[0].total,
+      body: orderResults,
+    });
+  } catch (error) {
+    console.error("error ", error);
+    res.status(500).send({ status: "Orders failed" });
+  }
 });
-
+app.post("/return/filter", async (req, res) => {
+  const { username, pageNumber, pageSize } = req.body;
+  const countQuery = `SELECT count(r.id) as total FROM orders r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
+  `;
+  try {
+    const countResults = await promisedQuery(countQuery);
+    const returnQuary = `SELECT r.*, u.username as boughtBy  FROM orders r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
+    ORDER BY r.id desc
+    LIMIT ${(pageNumber - 1) * pageSize}, ${pageSize} ; `;
+    const returnResults = await promisedQuery(ordersQuery);
+    res.status(200).send({
+      status: "return fetched succusfully",
+      totalElements: countResults[0].total,
+      body: orderResults,
+    });
+  } catch (error) {
+    console.error("error", error);
+    res.status(500).send({ status: "return failed" });
+  }
+});
 app.post("/feedback", (req, res) => {
   const feedback = req.body;
   pool.query(
@@ -120,11 +146,9 @@ app.post("/feedback", (req, res) => {
     }
   );
 });
-
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
-
 function promisedQuery(query) {
   return new Promise((resolve, reject) => {
     pool.query(query, (error, results, fields) => {
