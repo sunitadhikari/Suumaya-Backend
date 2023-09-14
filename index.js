@@ -114,18 +114,18 @@ app.post("/orders/filter", async (req, res) => {
 });
 app.post("/return/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
-  const countQuery = `SELECT count(r.id) as total FROM orders r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
+  const countQuery = `SELECT count(r.id) as total FROM return r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
   `;
   try {
     const countResults = await promisedQuery(countQuery);
-    const returnQuary = `SELECT r.*, u.username as boughtBy  FROM orders r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
+    const returnQuery = `SELECT r.*, u.username as boughtBy  FROM return r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
     ORDER BY r.id desc
     LIMIT ${(pageNumber - 1) * pageSize}, ${pageSize} ; `;
-    const returnResults = await promisedQuery(ordersQuery);
+    const returnResults = await promisedQuery(returnQuery);
     res.status(200).send({
       status: "return fetched succusfully",
       totalElements: countResults[0].total,
-      body: orderResults,
+      body: returnResults,
     });
   } catch (error) {
     console.error("error", error);
