@@ -114,12 +114,23 @@ app.post("/orders/filter", async (req, res) => {
 });
 app.post("/return/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
-  const countQuery = `SELECT count(r.id) as total FROM return r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
+  const countQuery = `
+  SELECT COUNT(*) as total
+  FROM order_return ore
   `;
   try {
     const countResults = await promisedQuery(countQuery);
-    const returnQuery = `SELECT r.*, u.username as boughtBy  FROM return r LEFT JOIN user u ON r.user_id = u.id WHERE u.username = '${username}'
-    ORDER BY r.id desc
+    const returnQuery = `
+    SELECT ore.id as returnId, ore.Date as returnedDate, p.Name as productName, o.id as orderId, u.username as boughtBy, 
+    Case 
+    WHEN DateDIFF(ore.date, o.date) > p.days_for_rent THEN false
+    ELSE true
+    END as onTime
+    FROM order_return ore
+    JOIN ORDERS o on o.ID = ore.order_id
+    JOIN PRODUCTS p on p.Id = o.product_id
+    JOIN User u on u.id = ore.user_id
+    ORDER BY ore.date desc
     LIMIT ${(pageNumber - 1) * pageSize}, ${pageSize} ; `;
     const returnResults = await promisedQuery(returnQuery);
     res.status(200).send({
