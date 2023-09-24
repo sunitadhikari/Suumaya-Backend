@@ -52,16 +52,22 @@ app.post("/products/filter", async (req, res) => {
   const { pageNumber } = filter ?? 1;
   const { pageSize } = filter ?? 10;
   const offset = (pageNumber - 1) * pageSize;
+  const { category } = filter;
 
   try {
-    const countQuery = `SELECT COUNT(*) as total FROM products`;
+    let countQuery = `SELECT COUNT(*) as total FROM products p `;
+    if (category)
+      countQuery += `
+    where p.category = '${category}' `;
     const countResults = await promisedQuery(countQuery);
-    const productQuery = `SELECT p.*, GROUP_CONCAT(f.file_key) as images FROM products p 
+    let productQuery = `SELECT p.*, GROUP_CONCAT(f.file_key) as images FROM products p 
     LEFT JOIN product_file pf
     ON p.id = pf.product_id
     LEFT JOIN file f
-    ON f.id = pf.file_id
-    GROUP BY p.id limit ${offset}, ${pageSize}`;
+    ON f.id = pf.file_id 
+    `;
+    if (category) productQuery += ` where p.category = '${category}' `;
+    productQuery += `GROUP BY p.id limit ${offset}, ${pageSize}`;
     const productResults = await promisedQuery(productQuery);
 
     res.status(200).send({
@@ -111,6 +117,16 @@ app.post("/orders/filter", async (req, res) => {
     console.error("error ", error);
     res.status(500).send({ status: "Orders failed" });
   }
+  pool.query(
+    `INSERT INTO orders( size, quantity) VALUES ('${orders.size}', '${orders.quantity}');`,
+    function (error, results, fields) {
+      if (error) {
+        res.send("Unable to Rent");
+      } else {
+        res.send({ status: "200 OK", message: "Rent Successfful" });
+      }
+    }
+  );
 });
 app.post("/return/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
