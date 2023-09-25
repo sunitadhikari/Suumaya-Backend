@@ -42,8 +42,8 @@ app.post("/login", async (req, res) => {
   const user = req.body;
   const loginQuery = `SELECT * FROM user where username = '${user.username}' AND password = '${user.password}'; `;
   const result = await promisedQuery(loginQuery);
-  if (result) {
-    res.status(200).send({ status: "Login Successfull" });
+  if (result?.length > 0) {
+    res.status(200).send({ status: "Login Successfull", user: result[0] });
   } else res.status(401).send({ staus: "Incorrect username or password" });
 });
 
@@ -100,13 +100,22 @@ app.post("/products", (req, res) => {
 });
 app.post("/orders/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
-  const countQuery = `SELECT count(o.id) as total FROM orders o LEFT JOIN user u ON o.user_id = u.id WHERE u.username = '${username}'
+  let countQuery = `SELECT count(o.id) as total FROM orders o LEFT JOIN user u ON o.user_id = u.id 
+  `;
+  if (username)
+    countQuery += `
+   WHERE u.username = '${username}'
 `;
   try {
     const countResults = await promisedQuery(countQuery);
-    const ordersQuery = `SELECT o.*, u.username as boughtBy  FROM orders o LEFT JOIN user u ON o.user_id = u.id WHERE u.username = '${username}'
-  ORDER BY o.id desc
-  LIMIT ${(pageNumber - 1) * pageSize} , ${pageSize} ; `;
+    let ordersQuery = `SELECT o.*, u.username as boughtBy  FROM orders o JOIN user u ON o.user_id = u.id `;
+    if (username)
+      ordersQuery += `
+   WHERE u.username = '${username}'
+`;
+    ordersQuery += `ORDER BY o.id desc LIMIT ${
+      (pageNumber - 1) * pageSize
+    } , ${pageSize} ; `;
     const orderResults = await promisedQuery(ordersQuery);
     res.status(200).send({
       status: "Orders Fetched Successfull",
@@ -117,16 +126,6 @@ app.post("/orders/filter", async (req, res) => {
     console.error("error ", error);
     res.status(500).send({ status: "Orders failed" });
   }
-  pool.query(
-    `INSERT INTO orders( size, quantity) VALUES ('${orders.size}', '${orders.quantity}');`,
-    function (error, results, fields) {
-      if (error) {
-        res.send("Unable to Rent");
-      } else {
-        res.send({ status: "200 OK", message: "Rent Successfful" });
-      }
-    }
-  );
 });
 app.post("/return/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
@@ -134,6 +133,7 @@ app.post("/return/filter", async (req, res) => {
   SELECT COUNT(*) as total
   FROM order_return ore
   `;
+  if (username) countQuery += `WHERE u.username = '${username}'`;
   try {
     const countResults = await promisedQuery(countQuery);
     const returnQuery = `
@@ -148,6 +148,12 @@ app.post("/return/filter", async (req, res) => {
     JOIN User u on u.id = ore.user_id
     ORDER BY ore.date desc
     LIMIT ${(pageNumber - 1) * pageSize}, ${pageSize} ; `;
+    if (username)
+      returnQuery += `
+    WHERE u.username = '${username}'`;
+    returnQuery += `RETURN BY ore.id desc LIMIT ${
+      (pageNumber - 1) * pageSize
+    }, ${pageSize};`;
     const returnResults = await promisedQuery(returnQuery);
     res.status(200).send({
       status: "return fetched succusfully",
