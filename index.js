@@ -165,6 +165,31 @@ app.post("/return/filter", async (req, res) => {
     res.status(500).send({ status: "return failed" });
   }
 });
+app.post("/feedback/filter", async (req, res) => {
+  const { username, pageNumber, pageSize } = req.body;
+  let countQuery = `SELECT count(f.id) as total FROM feedback f LEFT JOIN user u ON f.user_id = f.id `;
+  if (username)
+    countQuery += `
+  WHERE u.username = '${username}'`;
+  try {
+    const countResults = await promisedQuery(countQuery);
+    let feedbackQuery = `SELECT f.*, u.username as name FROM feedback f JOIN user u ON f.user_id = u.id FEEDBACK BY f.id DESC LIMIT 10;
+    `;
+    if (username) feedbackQuery += `WHERE u.username = '${username}'`;
+    feedbackQuery += `FEEDBACK BY f.id desc LIMIT ${
+      (pageNumber - 1) * pageSize
+    }, ${pageSize};`;
+    const feedbackResults = await promisedQuery(feedbackQuery);
+    res.status(200).send({
+      status: "Feedback Fetched Successfull",
+      totalElements: countResults[0].total,
+      body: feedbackResults,
+    });
+  } catch (error) {
+    console.error("error", error);
+    res.status(500).send({ status: "Feedback failed" });
+  }
+});
 app.post("/feedback", (req, res) => {
   const feedback = req.body;
   pool.query(
