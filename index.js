@@ -118,7 +118,7 @@ app.post("/orders/filter", async (req, res) => {
     } , ${pageSize} ; `;
     const orderResults = await promisedQuery(ordersQuery);
     res.status(200).send({
-      status: "Orders Fetched Successfull",
+      status: "Order Fetched Successfull",
       totalElements: countResults[0].total,
       body: orderResults,
     });
