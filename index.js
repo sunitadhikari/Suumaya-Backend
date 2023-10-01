@@ -80,11 +80,27 @@ app.post("/products/filter", async (req, res) => {
     res.status(500).send({ status: "Failed to get products" });
   }
 });
+app.put("/products/:id", async (req, res) => {
+  const id = req.params.id;
 
+  const { name, price, details, size, category, days_for_rent } = req.body;
+  console.log(req.body);
+  const productQuery = `SELECT * FROM products where id = '${id}' `;
+  const result = await promisedQuery(productQuery);
+  if (result?.length > 0) {
+    const productQuery = `Update products set name='${name}', price='${price}',details='${details}', size='${size}',category='${category}','4'  where id = '${id}' `;
+    const productUpdate = await promisedQuery(productQuery);
+    if (productUpdate) {
+      res.status(200).send({ staus: "Product updated" });
+    }
+  } else {
+    res.status(404).send({ staus: "Product not found" });
+  }
+});
 app.post("/products", (req, res) => {
   const product = req.body;
   pool.query(
-    `INSERT INTO products (name, details,size, price, category) VALUES ('${product.name}','${product.detail}' ,'${product.size}','${product.price}','${product.category}');`,
+    `INSERT INTO products (name, details,size, price, category) VALUES ('${product.name}','${product.details}' ,'${product.size}','${product.price}','${product.category}');`,
     function (error, results, fields) {
       // if (results?.length > 0) res.send({ status: "login_successfull" });
       // else res.send({ status: "login_failed" });
@@ -98,6 +114,7 @@ app.post("/products", (req, res) => {
     }
   );
 });
+
 app.post("/orders/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
   let countQuery = `SELECT count(o.id) as total FROM orders o LEFT JOIN user u ON o.user_id = u.id 
@@ -108,7 +125,7 @@ app.post("/orders/filter", async (req, res) => {
 `;
   try {
     const countResults = await promisedQuery(countQuery);
-    let ordersQuery = `SELECT o.*, u.username as boughtBy  FROM orders o JOIN user u ON o.user_id = u.id `;
+    let ordersQuery = `SELECT o.*, u.username as boughtBy, u.address as address  FROM orders o JOIN user u ON o.user_id = u.id `;
     if (username)
       ordersQuery += `
    WHERE u.username = '${username}'
@@ -127,17 +144,34 @@ app.post("/orders/filter", async (req, res) => {
     res.status(500).send({ status: "Orders failed" });
   }
 });
+app.post("/orders", (req, res) => {
+  const product = req.body;
+
+  pool.query(
+    `INSERT INTO orders (price, size, user_id, product_id, transaction_id) VALUES ('${product.price}','${product.size}','${product.userId}','${product.productId}', '${product.transactionId}');`,
+    function (error, result, fields) {
+      if (error) {
+        console.error("Error in Ordering products:", error);
+        res.status(500).send({ messge: "could not order product" });
+      } else {
+        res.send({ status: "200 ok", message: "Product ordered" });
+      }
+    }
+  );
+});
 app.post("/return/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
-  const countQuery = `
+  let countQuery = `
   SELECT COUNT(*) as total
   FROM order_return ore
   `;
-  if (username) countQuery += `WHERE u.username = '${username}'`;
+  if (username)
+    countQuery += ` JOIN orders o on o.id = ore.order_id JOIN user u on u.id = o.user_id WHERE u.username = '${username}'`;
   try {
     const countResults = await promisedQuery(countQuery);
-    const returnQuery = `
-    SELECT ore.id as returnId, ore.Date as returnedDate, p.Name as productName, o.id as orderId, u.username as boughtBy, 
+    let returnQuery = `
+    SELECT ore.id as returnId, ore.Date as returnedDate, 
+    p.Name as productName, p.id as product_id, o.id as orderId, o.date as orderedDate, u.username as boughtBy, 
     Case 
     WHEN DateDIFF(ore.date, o.date) > p.days_for_rent THEN false
     ELSE true
@@ -145,15 +179,14 @@ app.post("/return/filter", async (req, res) => {
     FROM order_return ore
     JOIN ORDERS o on o.ID = ore.order_id
     JOIN PRODUCTS p on p.Id = o.product_id
-    JOIN User u on u.id = ore.user_id
-    ORDER BY ore.date desc
-    LIMIT ${(pageNumber - 1) * pageSize}, ${pageSize} ; `;
+    JOIN User u on u.id = o.user_id `;
     if (username)
       returnQuery += `
-    WHERE u.username = '${username}'`;
-    returnQuery += `RETURN BY ore.id desc LIMIT ${
-      (pageNumber - 1) * pageSize
-    }, ${pageSize};`;
+  WHERE u.username = '${username}'`;
+    returnQuery += `
+    ORDER BY ore.date desc
+    LIMIT ${(pageNumber - 1) * pageSize}, ${pageSize} ; `;
+
     const returnResults = await promisedQuery(returnQuery);
     res.status(200).send({
       status: "return fetched succusfully",
@@ -167,16 +200,19 @@ app.post("/return/filter", async (req, res) => {
 });
 app.post("/feedback/filter", async (req, res) => {
   const { username, pageNumber, pageSize } = req.body;
-  let countQuery = `SELECT count(f.id) as total FROM feedback f LEFT JOIN user u ON f.user_id = f.id `;
+  let countQuery = `SELECT count(*) as total FROM feedback f  `;
   if (username)
     countQuery += `
-  WHERE u.username = '${username}'`;
+    JOIN user u on user_id = f.user_id  WHERE u.username = '${username}'`;
   try {
     const countResults = await promisedQuery(countQuery);
-    let feedbackQuery = `SELECT f.*, u.username as name FROM feedback f JOIN user u ON f.user_id = u.id FEEDBACK BY f.id DESC LIMIT 10;
+    let feedbackQuery = `SELECT f.id as id, f.date as date, u.username as name,  
+    f.message as message
+    FROM FEEDBACK f
+       JOIN user u on u.id = f.user_id 
     `;
-    if (username) feedbackQuery += `WHERE u.username = '${username}'`;
-    feedbackQuery += `FEEDBACK BY f.id desc LIMIT ${
+    if (username) feedbackQuery += ` WHERE u.username = '${username}'`;
+    feedbackQuery += ` ORDER BY f.date desc LIMIT ${
       (pageNumber - 1) * pageSize
     }, ${pageSize};`;
     const feedbackResults = await promisedQuery(feedbackQuery);
@@ -204,6 +240,18 @@ app.post("/feedback", (req, res) => {
     }
   );
 });
+app.get("/products/:id", async (req, res) => {
+  const productId = req.params["id"];
+  console.log("gor tersulf for ", productId);
+  try {
+    const query = `SELECT * FROM PRODUCTS p where p.id = '${productId}'`;
+    const productResults = await promisedQuery(query);
+    res.send({ status: "ok", body: productResults[0] });
+  } catch (error) {
+    console.error("error", error);
+    res.status(500).send({ status: "Feedback failed" });
+  }
+});
 app.listen(port, () => {
   console.log(`Example app listening on port ${port}`);
 });
@@ -218,6 +266,6 @@ function promisedQuery(query) {
   });
 
   function failResponse(status, body) {}
-
   function successResponse(status, body) {}
 }
+// clamped
