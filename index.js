@@ -60,14 +60,9 @@ app.post("/products/filter", async (req, res) => {
       countQuery += `
     where p.category = '${category}' `;
     const countResults = await promisedQuery(countQuery);
-    let productQuery = `SELECT p.*, GROUP_CONCAT(f.file_key) as images FROM products p 
-    LEFT JOIN product_file pf
-    ON p.id = pf.product_id
-    LEFT JOIN file f
-    ON f.id = pf.file_id 
-    `;
+    let productQuery = `SELECT p.* FROM products p `;
     if (category) productQuery += ` where p.category = '${category}' `;
-    productQuery += `GROUP BY p.id limit ${offset}, ${pageSize}`;
+    productQuery += ` ORDER BY p.created_date, p.updated_date DESC limit ${offset}, ${pageSize} `;
     const productResults = await promisedQuery(productQuery);
 
     res.status(200).send({
@@ -83,24 +78,26 @@ app.post("/products/filter", async (req, res) => {
 app.put("/products/:id", async (req, res) => {
   const id = req.params.id;
 
-  const { name, price, details, size, category, days_for_rent } = req.body;
-  console.log(req.body);
+  const { name, price, details, size, category, days_for_rent, image } =
+    req.body;
   const productQuery = `SELECT * FROM products where id = '${id}' `;
   const result = await promisedQuery(productQuery);
   if (result?.length > 0) {
-    const productQuery = `Update products set name='${name}', price='${price}',details='${details}', size='${size}',category='${category}','4'  where id = '${id}' `;
+    const productQuery = `Update products set name='${name}', price='${price}',details='${details}', size='${size}',category='${category}', days_for_rent='4', image='${image}'  where id = '${id}' `;
     const productUpdate = await promisedQuery(productQuery);
     if (productUpdate) {
-      res.status(200).send({ staus: "Product updated" });
+      res.status(200).send({ message: "Product updated" });
     }
   } else {
-    res.status(404).send({ staus: "Product not found" });
+    res.status(404).send({ message: "Product not found" });
   }
 });
 app.post("/products", (req, res) => {
   const product = req.body;
   pool.query(
-    `INSERT INTO products (name, details,size, price, category) VALUES ('${product.name}','${product.details}' ,'${product.size}','${product.price}','${product.category}');`,
+    `INSERT INTO products (name, details,size, price, category, image) 
+    VALUES ('${product.name}','${product.details}' ,'${product.size}','${product.price}','${product.category}' , 
+    '${product.image}');`,
     function (error, results, fields) {
       // if (results?.length > 0) res.send({ status: "login_successfull" });
       // else res.send({ status: "login_failed" });
@@ -148,7 +145,7 @@ app.post("/orders", (req, res) => {
   const product = req.body;
 
   pool.query(
-    `INSERT INTO orders (price, size, user_id, product_id, transaction_id) VALUES ('${product.price}','${product.size}','${product.userId}','${product.productId}', '${product.transactionId}');`,
+    `INSERT INTO orders (price, size, user_id, product_id, quantity, transaction_id) VALUES ('${product.price}','${product.size}','${product.userId}','${product.productId}', '${product.quantity}', '${product.transactionId}');`,
     function (error, result, fields) {
       if (error) {
         console.error("Error in Ordering products:", error);
@@ -242,7 +239,6 @@ app.post("/feedback", (req, res) => {
 });
 app.get("/products/:id", async (req, res) => {
   const productId = req.params["id"];
-  console.log("gor tersulf for ", productId);
   try {
     const query = `SELECT * FROM PRODUCTS p where p.id = '${productId}'`;
     const productResults = await promisedQuery(query);
