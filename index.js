@@ -122,7 +122,7 @@ app.post("/orders/filter", async (req, res) => {
 `;
   try {
     const countResults = await promisedQuery(countQuery);
-    let ordersQuery = `SELECT o.*, u.username as boughtBy, u.address as address  FROM orders o JOIN user u ON o.user_id = u.id `;
+    let ordersQuery = `SELECT o.*, o.user_id as userId, o.product_id as productId, o.transaction_id as transactionId,  u.username as boughtBy, u.address as address  FROM orders o JOIN user u ON o.user_id = u.id `;
     if (username)
       ordersQuery += `
    WHERE u.username = '${username}'
@@ -226,10 +226,14 @@ app.post("/feedback/filter", async (req, res) => {
 app.post("/feedback", (req, res) => {
   const feedback = req.body;
   pool.query(
-    `INSERT INTO feedback (name, email, message, user_id ) VALUES ( '${feedback.name}', '${feedback.email}', '${feedback.message}', '${feedback.userId}');`,
+    `INSERT INTO feedback (message, user_id, date, order_id ) VALUES ( '${
+      feedback.message
+    }', '${feedback.userId}', '${new Date().toISOString()}','${
+      feedback.orderId
+    }');`,
     (error, results, fields) => {
       if (error) {
-        res.send("could not give feedback");
+        res.status(500).send("could not give feedback");
       } else {
         res.send({ status: "200 OK", message: "Added feedback" });
       }
