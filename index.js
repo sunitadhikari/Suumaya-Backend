@@ -78,12 +78,20 @@ app.post("/products/filter", async (req, res) => {
 app.put("/products/:id", async (req, res) => {
   const id = req.params.id;
 
-  const { name, price, details, size, category, days_for_rent, image } =
-    req.body;
+  const {
+    name,
+    price,
+    details,
+    size,
+    category,
+    available,
+    days_for_rent,
+    image,
+  } = req.body;
   const productQuery = `SELECT * FROM products where id = '${id}' `;
   const result = await promisedQuery(productQuery);
   if (result?.length > 0) {
-    const productQuery = `Update products set name='${name}', price='${price}',details='${details}', size='${size}',category='${category}', days_for_rent='4', image='${image}'  where id = '${id}' `;
+    const productQuery = `Update products set name='${name}', price='${price}',details='${details}', size='${size}',category='${category}', available='${available}', days_for_rent='4', image='${image}'  where id = '${id}' `;
     const productUpdate = await promisedQuery(productQuery);
     if (productUpdate) {
       res.status(200).send({ message: "Product updated" });
